@@ -1,57 +1,56 @@
 import os
-import sys
+import time
+import shutil
 import pytest
+import tempfile
+from log import log
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason="does not run on windows")
-class TestSizeFiles:
-    def setup(self):
-        print("3 basic setup into class")
-
-    def teardown(self):
-        print("5 basic teardown into class")
-
-    def setup_class(cls):
-        print("1 class setup")
-
-    def teardown_class(cls):
-        print("7 class teardown")
-
-    def setup_method(self, method):
-        print("2 method setup")
-
-    def teardown_method(self, method):
-        print("6 method teardown")
-    """
-    @pytest.fixture(autouse=True)
-    def test_dir1(self, test_dir):
-        print("test_dir")
-        print(test_dir)
-        if test_dir != "":
-            print("test_dir = not free")
-    """
-
-    def creat_file(self, path, filename, size):
-        filepath = os.path.join(path, filename)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        with open(filename, "wb") as f:
-            f.seek(size - 1)
-            f.write(b'0')
+def timer(f):
+    def wrap(*args):
+        time1 = time.time()
+        ret = f(*args)
+        time2 = time.time()
+        log.info("Start: {} Finish: {}".format(time1, time2))
+        return ret
+    return wrap
 
 
-    def test_check_file_size(self, test_dir):
-        print("4 test 3*4")
-        print("test_dir1")
-        print(test_dir)
-        file_path = os.getcwd()
-        file_name = "testfile1"
-        file_size = 1024
-        self.creat_file(file_path, file_name, file_size)
-        print(os.stat(file_name).st_size)
-        assert 3 * 4 == 12
+@pytest.yield_fixture
+def create_file(test_dir, request):
+    td = ""
+
+    @timer
+    def opener(size):
+        nonlocal td
+        td = tempfile.mkdtemp(prefix="testfile_{}_".format(size), dir=test_dir)
+        with tempfile.NamedTemporaryFile(mode='wb', dir=td, delete=False) as f:
+            if size > 0:
+                f.seek(size - 1)
+                f.write(b'0')
+        return f.name
+
+    yield opener
+
+    if request.node.rep_setup.failed:
+        log.info("Setting up a test failed! {}".format(request.node.nodeid))
+    elif request.node.rep_setup.passed:
+        if request.node.rep_call.failed:
+            log.info("Executing test failed! {}".format(request.node.nodeid))
+        else:
+            if td:
+                shutil.rmtree(td, ignore_errors=True)
 
 
-    def test_strings_a_3(self):
-        print("test a*3")
-        assert 'a' * 3 == 'aaa'
+test_size = [0, 1, 2, -16, 1048576]
+
+
+# @pytest.mark.skipif(sys.platform == 'win32', reason="does not run on windows")
+@pytest.mark.parametrize("file_size", test_size)
+def test_file_size(file_size, create_file):
+    log.info("test_file_size {}".format(file_size))
+    file_path = create_file(file_size)
+    log.info("Size: {} Path: {}".format(file_size, file_path))
+    statistic = os.stat(file_path)
+    log.info(statistic)
+    assert statistic.st_size == file_size
