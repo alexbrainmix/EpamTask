@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import shutil
 import pytest
@@ -42,10 +43,10 @@ def create_file(test_dir, request):
                 shutil.rmtree(td, ignore_errors=True)
 
 
-test_size = [0, 1, 2, -16, 1048576]
+test_size = [0, 1, 2, 1048576]
 
 
-# @pytest.mark.skipif(sys.platform == 'win32', reason="does not run on windows")
+@pytest.mark.skipif(sys.platform == 'win32', reason="does not run on windows")
 @pytest.mark.parametrize("file_size", test_size)
 def test_file_size(file_size, create_file):
     log.info("test_file_size {}".format(file_size))

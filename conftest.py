@@ -20,7 +20,7 @@ def test_dir(request):
     test_dir = request.config.getoption("--test_dir")
     path = os.getcwd()
     if test_dir:
-        path = '{}{}{}'.format(path, "\\", test_dir)
+        path = '{}{}{}'.format(path, "/", test_dir)
         if not os.path.exists(path):
             try:
                 os.makedirs(path)
